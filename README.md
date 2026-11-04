@@ -1,98 +1,96 @@
-# Airbag Safety Lab — 사고입력 × 상세결과 융합 대시보드
+# Airbag Safety Lab — 배포 오류 대응 안정화판 (2026-11-04)
 
-**기존 밝은 사고 환경 입력 UI** + **NHTSA 위험곡선, HIC15 Box Plot, 대응표본 t검정**을 합친 Streamlit 프로그램입니다.
+사고 환경 입력(360° 차량 충돌 방향)과 기존 영상, HIC15, NHTSA AIS 2+ 두개골 골절 추정위험, 3단계 시간별 분석, 대응표본 t검정을 제공하는 프로젝트입니다.
 
-## Windows 실행
+## 1. 이번 오류의 원인 및 수정사항
 
-1. 압축을 모두 해제한 후 `airbag_dashboard` 폴더를 엽니다.
-2. `run_dashboard.bat` 파일을 더블클릭합니다. 첫 실행에 필요한 Python 패키지가 설치됩니다.
-3. 브라우저에서 `http://localhost:8501`에 접속합니다.
+사용자가 보내준 Streamlit Cloud 로그는 **Python 3.14.10 / Streamlit 1.59.2 / Starlette 1.10.0** 환경에서 JavaScript 청크 요청이 실패하면서 다음과 같은 ASGI 예외가 발생했음을 보여줍니다.
 
-수동 실행:
+```
+RuntimeError: Expected ASGI message 'http.response.start', but got 'http.response.body'.
+```
+
+이 오류는 Python의 HIC 계산식과 관계없으며, Streamlit/Starlette의 GZip 미들웨어에 관련된 서버 측 오류로 의심됩니다. 공식 이슈 https://github.com/streamlit/streamlit/issues/16341 도 확인했습니다. 다만 동일 근본 원인이라고 100% 단정할 수는 없습니다.
+
+**안정화 조치**
+
+- `requirements.txt`에서 Streamlit `1.61.1`, Starlette `1.4.1`, Plotly `6.5.2`로 고정. 공식 이슈에서 Streamlit `1.61.1`과 Starlette `1.4.1`이 호환성 패치로 안내됨.
+- 이전 `use_container_width=True` 인자 모두 `width='stretch'`로 교체.
+- 이전 입력 UI와 영상·3단계 분석·NHTSA 위험곡선·고편차 통계 예시는 유지.
+- Streamlit Cloud가 다시 불안정해지더라도 영상과 결과를 열어볼 수 있도록 **GitHub Pages용 순수 HTML 백업**(`docs/index.html`)을 추가. 외부 JS/프레임워크 CDN 없이 동작하도록 제작.
+- Python **3.12**는 Streamlit Community Cloud의 **새 배포 Advanced settings**에서 직접 선택해야 함. `requirements.txt`, `.python-version`, `runtime.txt`만으로 Python 버전 변경 불가.
+
+> 코드 및 계산 테스트는 수행했지만, 이 환경에서는 Streamlit 패키지 설치 및 실제 브라우저 접속이 제한되어 **Streamlit Cloud 실제 재배포 성공은 확인하지 못했습니다**. 실제 서비스 응답은 재배포 직후 확인해야 합니다.
+
+## 2. 먼저 할 일: 서버 의존성만 교체 (가장 간단)
+
+현재 GitHub 저장소 `DongKiKong/airbag-safety-lab`를 유지하면서 바로 시험하려면 **기존 `requirements.txt` 내용을 아래처럼 바꾸고 Commit changes** 하세요.
+
+```txt
+streamlit==1.61.1
+starlette==1.4.1
+plotly==6.5.2
+numpy>=1.26,<3.0
+pandas>=2.1,<3.0
+scipy>=1.12,<2.0
+```
+
+Streamlit Cloud가 새 패키지를 설치하면 **시크릿 창**에서 테스트해 보세요. 예전 페이지 캐시로 인해 오래된 JS 청크를 요청하는 문제를 피하기 위한 조치입니다.
+
+그런데도 실패한다면 다음 절차로 재배포:
+
+1. 기존 앱 주소를 기록한 뒤 Streamlit Community Cloud **My apps → 앱 메뉴 → Delete** (GitHub 리포지토리는 삭제하지 않음).
+2. `Create app → Deploy a public app from GitHub`.
+3. Repository: `DongKiKong/airbag-safety-lab` / Branch: `main` / Main file path: `app.py`.
+4. **Advanced settings → Python 3.12** 선택 후 Deploy.
+5. 새 주소(또는 이전 주소 재사용)를 열어 입력 버튼·차트·동영상을 점검.
+
+공식 문서: https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python
+
+## 3. GitHub Pages 백업 배포 (Streamlit 서버가 계속 오류일 때 권장)
+
+`docs/index.html`은 **Python/Streamlit 서버 없이** 360° 충돌 선택, 영상 3개, 주요 결과, 머리 가속도 → Running HIC15 → NHTSA 골절 위험 그래프, 가정 데이터 t검정, CSV 입력을 지원합니다.
+
+아래 파일/폴더가 GitHub `main` 브랜치의 저장소 루트에 있어야 합니다.
+
+- `docs/index.html`
+- `docs/assets/compare_oblique.mp4`
+- `docs/assets/front_A.mp4`
+- `docs/assets/front_B.mp4`
+
+기존 저장소의 `assets/`, `data/`, `app.py`는 **삭제하지 마세요**. `docs/assets`는 GitHub Pages에서 영상을 재생하기 위한 별도 사본입니다. GitHub Pages에서 `/docs`를 사이트 루트로 지정하면 저장소 상위의 `/assets`에 직접 접근하지 못하기 때문에 별도 복사했습니다.
+
+**설정**: GitHub 저장소 → `Settings` → `Pages` → `Build and deployment` → `Deploy from a branch` → `main` / `/docs` → `Save`.
+
+공개될 주소 형식은 `https://dongkikong.github.io/airbag-safety-lab/` 입니다(설정 및 게시가 완료된 뒤에만 접속 가능). 정적 웹은 `~/+/static/js/...`와 같은 Streamlit 전용 JS 파일을 요청하지 않습니다. 단, 해당 GitHub Pages 링크도 여기서 실접속 검증한 것은 아닙니다.
+
+## 4. 데이터 해석 시 주의
+
+- 사선충돌 원본 집계: Rule-Based 245.6 / PPO 224.7. 50쌍 보고 수치, **속도 혼합 / 체중별 미분리**.
+- 정면 60kg 집계: 232.9 / 218.5. **원래 80km/h** 자료.
+- 정면 90kg 집계: 269.7 / 243.0. **원래 80km/h** 자료.
+- 100km/h 고편차 100쌍과 140km/h 예시는 **기존에 생성한 가상 데이터**, 실제 충돌해석 결과가 아님.
+- 머리 합성가속도 CSV가 없다면 시간별 3단계 그래프는 **평균 HIC15에 맞춘 시연용 가상 파형**으로 생성됨. 실제 시간별 충돌 거동으로 주장하면 안 됨.
+- 골절 추정확률은 NHTSA 성인 참조 AIS 2+ 두개골 골절 위험곡선 변환값. 실제 골절 발생률 또는 실험 독립 관찰치가 아님.
+- 골절 위험 t검정은 HIC에서 변환된 추정확률의 paired test로, HIC 검정과 독립적인 물리 검증이 아님.
+
+NHTSA 위험식: `P(AIS2+ skull fracture)=Φ((ln(HIC)−6.96352)/0.84664)`
+
+## 5. 사용 방법 및 검사
+
+로컬 실행(Windows):
 
 ```bat
-cd /d "C:\Users\USER\Desktop\졸프\airbag_dashboard"
 py -m pip install -r requirements.txt
 py -m streamlit run app.py
 ```
 
-Python 3.10 이상 권장. 처음 설치에 인터넷 연결이 필요할 수 있습니다.
+정적 HTML은 `docs/index.html`을 더블클릭해서 미리 볼 수도 있습니다.
 
-## 메뉴 구성
+검사:
 
-- **사고 환경 선택**: 두 대의 자동차 360° 충돌 접근각 탐색기(0° 전방, 45° 사선, 90° 측면, 180° 후방, 270° 좌측), 충돌 접근 애니메이션, 속도/체중/자세/벨트 입력, 기존 영상, 평균 HIC15, 위험곡선, 전개 정책 Factor, Box Plot 및 t검정.
-- **전체 실험 결과**: 원본 집계표와 60kg·90kg 정책 Factor 그래프, 고속 생성 데이터 대비.
-- **통계 검정**: 100km/h 고편차 합성 100쌍 분석(개별 HIC15 Box Plot, 골절 위험 Box Plot, 차이 분포, t, p값, 신뢰구간) 및 실제 대응표본 CSV 업로드 결과.
-- **이론 및 모델 설명**: HIC15, NHTSA AIS 2+ 골절 위험함수, PPO, 통계 해석.
-
-## 360° 입력 동작
-
-- **방향 프리셋 버튼** 또는 **0~359° 슬라이더**로 각도를 선택하면 두 자동차의 상대 위치가 회전합니다.
-- 차 그림의 `▶ 충돌 접근 보기` 버튼으로 차량 접근을 도식적으로 애니메이션합니다.
-- 두 차량의 움직임은 **방향선택 보조 그림**이며 실제 충돌 거동, 센서 출력 또는 물리 시뮬레이션이 아닙니다.
-- 원본 실험 결과로 연결되는 범위는 전방 약 0°와 사선 약 45°입니다. 측면·후방의 실제 HIC 데이터는 없으므로 억지로 만들어 표시하지 않습니다.
-
-## 실험 데이터의 출처와 해석 범위
-
-| 구분 | 데이터 | 의미 |
-|---|---|---|
-| 사선충돌 원본 집계 | 기존 245.6 / RL 224.7 (50쌍 집계) | **혼합 충돌속도·각도**, 체중별 미분리 |
-| 정면 약 60kg 원본 집계 | 기존 232.9 / RL 218.5 | 실제 기록의 원래 조건은 **80km/h**, UI의 60km/h 선택은 기존 슬롯 연결 |
-| 정면 약 90kg 원본 집계 | 기존 269.7 / RL 243.0 | 실제 기록의 원래 조건은 **80km/h** |
-| 100km/h Box Plot과 t검정 | 시나리오별 100쌍 생성 표본(이전 작성 데이터 보존) | **가상의 고편차 가정**, 실제 검증 증거 아님 |
-| 140km/h | 100km/h 생성 표본의 재배율 | 실제 해석 결과 아님 |
-
-원본 집계에는 개별 사고 조건에 대응되는 HIC15 값이 없어, 원본에 대한 실제 paired t-test p값을 계산할 수 없습니다. 대신 사고 환경 메뉴의 **집계 조건에 대한 SD 민감도 분석**을 사용하거나 원본 CSV를 업로드하세요. 생성 표본에서 p<0.05가 나왔다고 해서 실제 충돌에 대한 안전성 개선이 입증되는 것은 아닙니다.
-
-## 영상 매핑
-
-- 사선: 기존 규칙 기반 / RL 비교 합성 MP4 (좌 RL, 우 기존)
-- 정면: 원본 참고 영상 60kg/90kg (정책별 실측 짝 영상이 아님)
-- 입력 속도·자세·벨트에 따라 새 영상이 생성되지는 않습니다.
-
-## 실제 대응표본 CSV 업로드
-
-사이드바의 **실험별 HIC15 원자료 연결**에서 CSV를 업로드하세요. 예:
-
-```csv
-speed_kmh,mass_kg,direction,pair_id,baseline_hic15,rl_hic15
-100,60,전방,1,555.1,496.2
-100,60,전방,2,582.4,530.3
+```bat
+py -m pytest tests -q
 ```
 
-각 행은 반드시 동일한 사고 조건에서 두 정책을 적용해 얻은 HIC15의 대응쌍이어야 합니다. 방향 값은 `전방/front` 또는 `사선/oblique`로 지정합니다.
-
-## 검증
-
-`python -m pytest tests -q` 로 기능과 원본 집계값, 영상 구성, HIC 변환식, 생성 데이터 p값을 검사할 수 있습니다.
-
-NHTSA 위험곡선: https://www.nhtsa.gov/sites/nhtsa.gov/files/rev_criteria.pdf
-
-## v2: 머리 가속도 → HIC15 → 두개골 골절 추정확률 (시간축 연계)
-
-`사고 환경 선택` 페이지의 **시간별 안전성 분석**에 3개 그래프를 추가했습니다.
-
-1. 머리 합성가속도(g) / 충돌 후 시간(ms)
-2. Running HIC15 (해당 시점까지 15ms 이내 최대 HIC)
-3. NHTSA AIS 2+ **두개골 골절 추정위험곡선 대응값**(%) / 시간(ms)
-
-세 그래프 모두 **동일한 가속도 데이터**에서 계산됩니다. 따라서 3번의 곡선은 ‘각 시간까지의 최대 HIC15에 대한 위험곡선 변환값’이며 ‘해당 순간 실제 골절 발생확률’이 아닙니다.
-
-- 실제 머리 가속도 CSV가 있을 경우 해당 CSV를 업로드하면 직접 계산됩니다. 필수 열: `t_ms,baseline_head_acc_g,rl_head_acc_g` (단위 ms / g)
-- 미업로드 시 **인공 예시 파형**을 사용합니다. 이는 화면 테스트를 위해 집계 HIC 평균에 맞춘 가상 가속도이며 **사고해석 결과가 아닙니다.** 전환 스위치로 끌 수 있습니다.
-- CSV 업로드 후의 결과는 별도 신호 계산값이므로 초기 화면의 집계 HIC와 자동으로 같다고 가정하지 않습니다. 사용자가 CSV와 선택 조건의 일치 여부를 확인해야 합니다.
-- HIC 위험곡선의 HIC < 175 외삽 구간은 주의해 해석합니다.
-
-### 배포 안정성
-
-- `requirements.txt`에서 Streamlit 버전(1.59.2)과 Plotly 버전(6.5.2)을 **고정**해 자동 업데이트로 인한 JS 번들 변경 위험을 줄였습니다.
-- 차트는 기본 제공 `st.plotly_chart`만 사용합니다. 별도 서드파티 Streamlit 컴포넌트/외부 JavaScript CDN이 필요하지 않습니다.
-- `app.py`와 상대 경로(`assets/`, `data/`)로 구성되어 Cloud 실행 디렉터리에 독립적입니다. 업로드하지 않은 동영상은 가능한 곳에서 알림으로 대체하도록 설계했습니다.
-- 이전 화면의 **`Failed to fetch dynamically imported module`는 브라우저 캐시·네트워크·Streamlit 프런트엔드 청크 전달 문제일 수 있어** Python 코드만으로 100% 해결을 보장할 수 없습니다. 업데이트 후 시크릿창/강력 새로고침을 먼저 시도하세요.
-- Streamlit Community Cloud에서 새로 배포한다면 **Advanced settings → Python 3.12**를 권장합니다. 기존 앱의 Python 3.14를 3.12로 바꾸려면 Streamlit 공식 정책상 앱 삭제 후 재배포가 필요하며, **GitHub 저장소는 삭제하지 않아도 됩니다.**
-
-### 현재 GitHub 저장소에 업데이트하기 (최소 변경)
-
-`airbag_dashboard_quick_update.zip` 안의 4개 파일 `app.py`, `analysis_utils.py`, `requirements.txt`, `README.md`를 기존 저장소 루트에 덮어쓴 후 `Commit changes`를 누르면 나머지 `assets/`, `data/`, `collision_view.py` 등은 그대로 재사용합니다. Cloud가 재배포하면 하드 새로고침하세요.
-
-*앱의 입력 속도·자세·체중 선택 자체가 실제 새로운 Isaac Sim 물리 해석을 실행하는 것은 아닙니다.*
+이번 파일 기준 자동 Python 기능 테스트 **71개 통과**, 전체 Streamlit 페이지 코드를 호출하는 대체 UI 스모크 테스트 통과, JavaScript `node --check` 문법 검사 및 데이터·차트 초기화 스모크 테스트 통과, 영상 파일 `ffprobe`로 H.264/yuv420p 확인. **실제 배포 브라우저에서의 확인은 별도로 필요**합니다.

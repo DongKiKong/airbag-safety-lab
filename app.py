@@ -262,7 +262,7 @@ def signal_to_injury_section(base:float,rl:float,scenario_label:str)->None:
     m3.metric('골절 위험 대응값 차이',f'{r0-r1:+.2f}%p')
     st.caption('이 값은 바로 위 **시간 이력 신호에 대한 계산 결과**입니다. 업로드 CSV의 HIC15는 위쪽 실험 집계 평균과 다를 수 있습니다.')
     for label in ['acc','hic','risk']:
-        st.plotly_chart(_signal_plot(sample,label),use_container_width=True,
+        st.plotly_chart(_signal_plot(sample,label),width='stretch',
                         config={'displayModeBar':False},key=f'trace_{label}')
     st.info('**해석:** ③의 그래프는 각 시간까지의 **최대 Running HIC15를 위험함수에 대입한 값**입니다. '
             '충돌 순간별 골절 발생 확률이나 시간별 실제 골절 빈도를 뜻하지 않습니다. '
@@ -377,11 +377,11 @@ def statistical_panel(pairs,mode,source):
            't통계량':f'{risk["t"]:.3f}','자유도':risk['df'],
            '단측 p':f'{risk["p_one"]:.5f}',
            '평균 차이 95% CI':f'{risk["ci_low"]:.2f} ~ {risk["ci_high"]:.2f}%p'}]
-    st.dataframe(pd.DataFrame(rows),use_container_width=True,hide_index=True)
+    st.dataframe(pd.DataFrame(rows),width='stretch',hide_index=True)
     s1,s2=st.columns(2)
-    with s1:st.plotly_chart(box_plot(pairs),use_container_width=True,config={'displaylogo':False})
-    with s2:st.plotly_chart(box_plot(pairs,risk=True),use_container_width=True,config={'displaylogo':False})
-    st.plotly_chart(paired_difference_chart(pairs),use_container_width=True,config={'displaylogo':False})
+    with s1:st.plotly_chart(box_plot(pairs),width='stretch',config={'displaylogo':False})
+    with s2:st.plotly_chart(box_plot(pairs,risk=True),width='stretch',config={'displaylogo':False})
+    st.plotly_chart(paired_difference_chart(pairs),width='stretch',config={'displaylogo':False})
     if mode=='원자료':
         st.success('업로드한 대응표본의 검정: '+('평균 HIC15가 유의하게 감소했습니다.' if hic['improvement_supported'] else '유의한 평균 HIC15 감소를 확인하지 못했습니다.'))
     else:
@@ -415,7 +415,7 @@ def sensitivity_panel(base,rl,n=50):
         fig.add_scatter(x=[sd],y=[p],mode='markers',marker=dict(color=ORANGE,size=14),name='현재 SD 가정')
         fig.update_xaxes(title='가정된 대응 차이값 표준편차 (실제 측정값 아님)')
         fig.update_yaxes(title='단측 p값',range=[0,min(1,max(ps)*1.1)])
-        st.plotly_chart(fig,use_container_width=True,config={'displaylogo':False})
+        st.plotly_chart(fig,width='stretch',config={'displaylogo':False})
     st.caption('이 p값은 실제 시험으로 검정된 값이 아니라, 집계 평균과 임의 SD를 대입한 민감도 계산입니다.')
 
 
@@ -427,14 +427,14 @@ def scenario_page(real_data):
     l,r=st.columns([1.18,1],gap='large')
     with l:
         st.markdown('#### 360° 충돌 방향 탐색기')
-        st.plotly_chart(collision_figure(st.session_state.impact_angle),use_container_width=True,
+        st.plotly_chart(collision_figure(st.session_state.impact_angle),width='stretch',
                         config={'displayModeBar':False},key='car_collision_dial')
     with r:
         st.markdown('#### 사고 환경 설정')
         preset=st.columns(5)
         for col,deg,label in zip(preset,[0,45,90,180,270],['전방 0°','사선 45°','측면 90°','후방','좌측']):
             with col:
-                if st.button(label,key=f'angle_{deg}',use_container_width=True):
+                if st.button(label,key=f'angle_{deg}',width='stretch'):
                     st.session_state.impact_angle=deg
                     st.rerun()
         st.slider('차량 접근 방향 · 0°–359°',min_value=0,max_value=359,step=1,key='impact_angle',
@@ -474,8 +474,8 @@ def scenario_page(real_data):
     with cc:metric_card('HIC15 평균 감소',f'{cmp["reduction_pct"]:.1f}%','기존 방식 대비','green')
     with cd:metric_card('골절 추정위험 감소',f'{-cmp["risk_delta_pp"]:.2f}%p','평균 HIC의 위험함수 변환','green')
     a,b=st.columns([.83,1.17],gap='large')
-    with a:st.plotly_chart(hic_bar(base,rl),use_container_width=True,config={'displaylogo':False})
-    with b:st.plotly_chart(risk_curve(base,rl),use_container_width=True,config={'displaylogo':False})
+    with a:st.plotly_chart(hic_bar(base,rl),width='stretch',config={'displaylogo':False})
+    with b:st.plotly_chart(risk_curve(base,rl),width='stretch',config={'displaylogo':False})
     st.markdown(f'**해석:** HIC15 **{base:.1f} → {rl:.1f}** ({cmp["reduction_pct"]:.1f}% 감소), '
                 f'NHTSA 위험곡선 대응값 **{cmp["baseline_risk_pct"]:.2f}% → {cmp["rl_risk_pct"]:.2f}%** '
                 f'({-cmp["risk_delta_pp"]:.2f}%p 감소).')
@@ -487,7 +487,7 @@ def scenario_page(real_data):
     pcol,descr=st.columns([1.25,.75],gap='large')
     with pcol:
         fig,policy_note=policy_timeline(direction,mass)
-        st.plotly_chart(fig,use_container_width=True,config={'displaylogo':False})
+        st.plotly_chart(fig,width='stretch',config={'displaylogo':False})
     with descr:
         if direction=='사선':
             st.markdown('**Rule-Based** · 충돌 방향 기반 단일 에어백 선택 (연구용 단순화)')
@@ -497,7 +497,7 @@ def scenario_page(real_data):
             st.markdown('**Curriculum PPO** · 탑승자 체중에 따라 전개 시점·압력을 조정')
         st.caption(policy_note)
     if direction=='전방':
-        st.plotly_chart(weight_factors_fig(),use_container_width=True,config={'displaylogo':False})
+        st.plotly_chart(weight_factors_fig(),width='stretch',config={'displaylogo':False})
 
     st.markdown('### 분포·통계적 유의성')
     statistical_panel(result['pairs'],result['mode'],result['source'])
@@ -513,18 +513,18 @@ def overall_page():
     m=measured()
     out=summarize_measured(m)
     st.markdown('### 기존 발표자료의 집계')
-    st.dataframe(out,use_container_width=True,hide_index=True)
+    st.dataframe(out,width='stretch',hide_index=True)
     fig=base_figure(370)
     names=out['조건'].tolist()
     for key,name,color in [('기존 HIC15 평균','Rule-Based',ORANGE),('RL HIC15 평균','Curriculum PPO',BLUE)]:
         fig.add_bar(x=names,y=out[key],name=name,marker_color=color,text=[f'{v:.1f}' for v in out[key]],textposition='outside')
     fig.update_layout(barmode='group',title=dict(text='원본 HIC15 집계 평균',font=dict(size=16)))
-    st.plotly_chart(fig,use_container_width=True,config={'displaylogo':False})
+    st.plotly_chart(fig,width='stretch',config={'displaylogo':False})
     st.markdown('### 체중별 RL 전개 Factor')
     policy=pd.DataFrame({'평가지표':['평균 전개 타이밍 (ms)','평균 전개 압력 (kPa)','Rule-Based 평균 HIC15','Curriculum PPO 평균 HIC15'],
                          '60kg 집단':[9.8,115.8,232.9,218.5],'90kg 집단':[20.3,184.5,269.7,243.0]})
-    st.dataframe(policy,hide_index=True,use_container_width=True)
-    st.plotly_chart(weight_factors_fig(),use_container_width=True,config={'displaylogo':False})
+    st.dataframe(policy,hide_index=True,width='stretch')
+    st.plotly_chart(weight_factors_fig(),width='stretch',config={'displaylogo':False})
     st.markdown('### 100km/h 고편차 가정 결과 (시연용)')
     arr=[]
     for key,label in [('Oblique','사선충돌'),('Light 60kg','전방 · 경량 60kg'),('Heavy 90kg','전방 · 중량 90kg')]:
@@ -532,14 +532,14 @@ def overall_page():
         b=data.rule_HIC15.mean();r=data.RL_HIC15.mean()
         arr.append({'시나리오':label,'Rule-Based 평균':b,'PPO 평균':r,
                     '감소율 (%)':round((b-r)/b*100,2),'자료 구분':'100쌍 생성 데이터'})
-    st.dataframe(pd.DataFrame(arr),hide_index=True,use_container_width=True)
+    st.dataframe(pd.DataFrame(arr),hide_index=True,width='stretch')
     st.download_button('원본 집계 CSV 내려받기',out.to_csv(index=False).encode('utf-8-sig'),
                        file_name='reported_hic15_aggregates.csv',mime='text/csv')
     with st.expander('이전 초안의 알고리즘 비교 아카이브 (별도 실험)'):
         try:
             with (DATA/'experiment_summary.json').open(encoding='utf-8') as f:report=json.load(f)
             st.write('초기 대시보드 보고값이며 위의 3개 시나리오 및 최신 영상에서 재계산한 수치는 아닙니다.')
-            st.dataframe(pd.DataFrame(report['algorithms']),hide_index=True,use_container_width=True)
+            st.dataframe(pd.DataFrame(report['algorithms']),hide_index=True,width='stretch')
         except (KeyError,FileNotFoundError):
             st.info('이전 초안의 알고리즘 상세 결과표를 찾을 수 없습니다.')
 
@@ -565,7 +565,7 @@ def stats_page(real_data):
                     'HIC 차이 SD':round(h['sd_difference'],1), 'HIC t':round(h['t'],3),
                     'HIC 단측 p':round(h['p_one'],4),'골절위험 단측 p':round(r['p_one'],4),
                     '가정 데이터 판정':'유의' if h['improvement_supported'] else '유의성 미확보'})
-    st.dataframe(pd.DataFrame(arr),hide_index=True,use_container_width=True)
+    st.dataframe(pd.DataFrame(arr),hide_index=True,width='stretch')
     selected=st.selectbox('자세히 살펴볼 조건',['사선 45°','정면 60kg','정면 90kg'])
     direction,mass=({'사선 45°':('사선',60),'정면 60kg':('전방',60),'정면 90kg':('전방',90)})[selected]
     pair=demo_pairs(direction,mass,100)
@@ -581,7 +581,7 @@ def theory_page():
         st.markdown('**HIC15는 머리 합성가속도와 충격 지속시간으로 계산되는 지표입니다.**')
         st.latex(r'\mathrm{HIC}_{15}=\max_{0<t_2-t_1\le0.015}\left[(t_2-t_1)\left(\frac{1}{t_2-t_1}\int_{t_1}^{t_2}a(t)\,dt\right)^{2.5}\right]')
         st.latex(r'P(\mathrm{AIS\ 2+\ skull\ fracture})=\Phi\left(\frac{\ln(HIC)-6.96352}{0.84664}\right)')
-        st.plotly_chart(risk_curve(623,496.5),use_container_width=True,config={'displaylogo':False})
+        st.plotly_chart(risk_curve(623,496.5),width='stretch',config={'displaylogo':False})
         st.caption('623 및 496.5는 생성 데이터의 평균값이며, NHTSA 곡선은 실험으로 발생한 골절의 빈도를 직접 보여주지는 않습니다.')
         st.markdown(f'[NHTSA 원문 PDF]({NHTSA_SOURCE})')
     with tab2:

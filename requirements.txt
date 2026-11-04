@@ -1,3 +1,5 @@
+# Frozen after debugging Streamlit Cloud's Starlette/GZip ASGI failure.
+# Deployment: choose Python 3.12 through Community Cloud Advanced settings.
 streamlit==1.61.1
 starlette==1.4.1
 plotly==6.5.2
