@@ -88,3 +88,45 @@ def sample_csv() -> bytes:
     rl = 30 * np.exp(-0.5 * ((t-70) / 13)**2)
     frame = pd.DataFrame({"t_ms": t, "rl_head_acc_g": rl, "baseline_head_acc_g": baseline})
     return frame.to_csv(index=False).encode("utf-8-sig")
+
+
+def calibrated_demo_acceleration_csv(baseline_hic: float, rl_hic: float) -> bytes:
+    """ILLUSTRATION ONLY: artificial Gaussian pulses calibrated to final HIC15 means.
+
+    Deliberately not a reconstructed/observed head-acceleration history.
+    HIC is homogeneous of order 2.5 in acceleration. Scaling by
+    (target / initial_HIC)**0.4 makes the *computed* HIC reach the displayed
+    illustrative target, without claiming physical simulation realism.
+    """
+    b_target, r_target = float(baseline_hic), float(rl_hic)
+    if not (np.isfinite(b_target) and np.isfinite(r_target)) or b_target < 0 or r_target < 0:
+        raise ValueError("예시 HIC15 목표값이 올바르지 않습니다.")
+    t = np.arange(0.0, 121.0, 1.0)  # ms; for responsive demo charts
+    # Different shape/timing to illustrate that the policies may change trajectories.
+    b = (np.exp(-.5*((t-58)/10.5)**2) + .23*np.exp(-.5*((t-80)/7.0)**2))
+    r = (.85*np.exp(-.5*((t-62)/11.4)**2) + .13*np.exp(-.5*((t-83)/8.5)**2))
+    def scale(signal: np.ndarray, target: float) -> np.ndarray:
+        h = float(running_hic15(t,signal)[-1])
+        return signal*(target/h)**0.4 if target>0 else np.zeros_like(signal)
+    df = pd.DataFrame({'t_ms':t,
+                       'rl_head_acc_g':scale(r,r_target),
+                       'baseline_head_acc_g':scale(b,b_target)})
+    return df.to_csv(index=False).encode('utf-8-sig')
+
+
+def trajectory_frame(result: Result) -> pd.DataFrame:
+    """All three stages at each sampled time, risk based on RUNNING max HIC.
+
+    The calculated probability is an NHTSA fitted risk-curve ordinate, not
+    the probability that a skull fractures *at this instant*.
+    """
+    from injury_risk import nhtsa_skull_fracture_risk_pct
+    return pd.DataFrame({
+        't_ms':result.t_ms,
+        'baseline_head_acc_g':result.baseline_g,
+        'rl_head_acc_g':result.rl_g,
+        'baseline_running_hic15':result.baseline_running,
+        'rl_running_hic15':result.rl_running,
+        'baseline_skull_fracture_risk_pct':nhtsa_skull_fracture_risk_pct(result.baseline_running),
+        'rl_skull_fracture_risk_pct':nhtsa_skull_fracture_risk_pct(result.rl_running),
+    })

@@ -67,3 +67,32 @@ speed_kmh,mass_kg,direction,pair_id,baseline_hic15,rl_hic15
 `python -m pytest tests -q` 로 기능과 원본 집계값, 영상 구성, HIC 변환식, 생성 데이터 p값을 검사할 수 있습니다.
 
 NHTSA 위험곡선: https://www.nhtsa.gov/sites/nhtsa.gov/files/rev_criteria.pdf
+
+## v2: 머리 가속도 → HIC15 → 두개골 골절 추정확률 (시간축 연계)
+
+`사고 환경 선택` 페이지의 **시간별 안전성 분석**에 3개 그래프를 추가했습니다.
+
+1. 머리 합성가속도(g) / 충돌 후 시간(ms)
+2. Running HIC15 (해당 시점까지 15ms 이내 최대 HIC)
+3. NHTSA AIS 2+ **두개골 골절 추정위험곡선 대응값**(%) / 시간(ms)
+
+세 그래프 모두 **동일한 가속도 데이터**에서 계산됩니다. 따라서 3번의 곡선은 ‘각 시간까지의 최대 HIC15에 대한 위험곡선 변환값’이며 ‘해당 순간 실제 골절 발생확률’이 아닙니다.
+
+- 실제 머리 가속도 CSV가 있을 경우 해당 CSV를 업로드하면 직접 계산됩니다. 필수 열: `t_ms,baseline_head_acc_g,rl_head_acc_g` (단위 ms / g)
+- 미업로드 시 **인공 예시 파형**을 사용합니다. 이는 화면 테스트를 위해 집계 HIC 평균에 맞춘 가상 가속도이며 **사고해석 결과가 아닙니다.** 전환 스위치로 끌 수 있습니다.
+- CSV 업로드 후의 결과는 별도 신호 계산값이므로 초기 화면의 집계 HIC와 자동으로 같다고 가정하지 않습니다. 사용자가 CSV와 선택 조건의 일치 여부를 확인해야 합니다.
+- HIC 위험곡선의 HIC < 175 외삽 구간은 주의해 해석합니다.
+
+### 배포 안정성
+
+- `requirements.txt`에서 Streamlit 버전(1.59.2)과 Plotly 버전(6.5.2)을 **고정**해 자동 업데이트로 인한 JS 번들 변경 위험을 줄였습니다.
+- 차트는 기본 제공 `st.plotly_chart`만 사용합니다. 별도 서드파티 Streamlit 컴포넌트/외부 JavaScript CDN이 필요하지 않습니다.
+- `app.py`와 상대 경로(`assets/`, `data/`)로 구성되어 Cloud 실행 디렉터리에 독립적입니다. 업로드하지 않은 동영상은 가능한 곳에서 알림으로 대체하도록 설계했습니다.
+- 이전 화면의 **`Failed to fetch dynamically imported module`는 브라우저 캐시·네트워크·Streamlit 프런트엔드 청크 전달 문제일 수 있어** Python 코드만으로 100% 해결을 보장할 수 없습니다. 업데이트 후 시크릿창/강력 새로고침을 먼저 시도하세요.
+- Streamlit Community Cloud에서 새로 배포한다면 **Advanced settings → Python 3.12**를 권장합니다. 기존 앱의 Python 3.14를 3.12로 바꾸려면 Streamlit 공식 정책상 앱 삭제 후 재배포가 필요하며, **GitHub 저장소는 삭제하지 않아도 됩니다.**
+
+### 현재 GitHub 저장소에 업데이트하기 (최소 변경)
+
+`airbag_dashboard_quick_update.zip` 안의 4개 파일 `app.py`, `analysis_utils.py`, `requirements.txt`, `README.md`를 기존 저장소 루트에 덮어쓴 후 `Commit changes`를 누르면 나머지 `assets/`, `data/`, `collision_view.py` 등은 그대로 재사용합니다. Cloud가 재배포하면 하드 새로고침하세요.
+
+*앱의 입력 속도·자세·체중 선택 자체가 실제 새로운 Isaac Sim 물리 해석을 실행하는 것은 아닙니다.*

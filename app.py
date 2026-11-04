@@ -17,6 +17,8 @@ import streamlit as st
 from scipy import stats
 
 from collision_view import collision_class, collision_figure
+from analysis_utils import (parse_acceleration_csv, calibrated_demo_acceleration_csv,
+                            trajectory_frame)
 from injury_risk import ADULT_REFERENCE_HIC15, NHTSA_SOURCE, nhtsa_skull_fracture_risk_pct
 from measured_results import compute_comparison, load_measured, summarize_measured
 from scenario_statistics import paired_t_test, read_matched_csv, filter_pairs
@@ -38,7 +40,7 @@ def styles():
     .block-container{max-width:1430px;padding-top:1.35rem;padding-bottom:2.5rem;}
     [data-testid="stSidebar"]{background:#F8FAFD;border-right:1px solid #E4EBF4;}
     h1,h2,h3{color:#17324F;letter-spacing:-0.03em;}
-    h1{font-weight:800;}
+    h1{font-weight:800; font-size:clamp(1.85rem,3.0vw,2.65rem);}
     .small-kicker{font-size:.77rem;color:#2867C0;font-weight:800;letter-spacing:.10em;}
     .lead{font-size:.97rem;color:#536780;line-height:1.7;margin-bottom:1.2rem;}
     .soft-panel{border:1px solid #DDE8F5;border-radius:14px;background:#F4F8FD;padding:12px 15px;}
@@ -49,6 +51,10 @@ def styles():
     .green{color:#0C946D}.blue{color:#2563EB}.orange{color:#CF7828}
     div[data-testid="stMetric"]{border:1px solid #E3EBF5;border-radius:12px;padding:12px;background:#FFF;}
     div[data-testid="stPlotlyChart"]{border:1px solid #E7EDF6;border-radius:14px;background:#FFF;padding:5px;}
+    .flow-step{color:#56728D; font-weight:700; font-size:.82rem; padding:9px 10px;
+        border-radius:10px; border:1px solid #DCE7F3; background:white; text-align:center;}
+    @media (max-width:820px){.block-container{padding-left:1rem;padding-right:1rem;}
+        .metric-val{font-size:1.42rem;} h1{font-size:1.85rem;}}
     .stButton>button{border-radius:10px;}
     .pill{display:inline-block;border:1px solid #D8E5F4;border-radius:999px;padding:5px 10px;font-weight:700;font-size:.8rem;color:#315678;background:#F5F9FF;}
     </style>''',unsafe_allow_html=True)
@@ -178,6 +184,100 @@ def paired_difference_chart(pairs):
     fig.update_xaxes(title='HIC15 차이 (기존 − RL) · 양수 = 개선')
     fig.update_yaxes(title='표본 수')
     return fig
+
+
+
+
+# Same actual or explicitly simulated signal drives all three time-domain charts.
+# Each plot is lightweight Plotly (no custom Streamlit components or external JS).
+def _signal_plot(time_frame:pd.DataFrame, what:str)->go.Figure:
+    options={
+        'acc':('baseline_head_acc_g','rl_head_acc_g','머리 합성가속도 (g)',
+               'STEP 01 · 시간별 머리 합성가속도'),
+        'hic':('baseline_running_hic15','rl_running_hic15','Running HIC15',
+               'STEP 02 · Running HIC15 (15ms 이내 최대값)'),
+        'risk':('baseline_skull_fracture_risk_pct','rl_skull_fracture_risk_pct',
+                '두개골 골절 추정위험 (%)',
+                'STEP 03 · 누적 최대 HIC15 대응 골절 추정위험'),
+    }
+    bcol,rcol,ytitle,title=options[what]
+    fig=base_figure(286)
+    for col,label,color in [(bcol,'Rule-Based',ORANGE),(rcol,'Curriculum PPO',BLUE)]:
+        vals=time_frame[col].to_numpy()
+        fig.add_trace(go.Scatter(x=time_frame.t_ms,y=vals,mode='lines',name=label,
+                                 line=dict(color=color,width=3),
+                                 hovertemplate='충돌 후 %{x:.0f}ms<br>'+label+': %{y:.2f}<extra></extra>'))
+    fig.update_layout(title=dict(text=title,font=dict(size=15)),
+                      hovermode='x unified',height=286,
+                      legend=dict(orientation='h',x=0,y=1.15))
+    fig.update_xaxes(title='충돌 후 시간 (ms)',range=[float(time_frame.t_ms.min()),float(time_frame.t_ms.max())])
+    fig.update_yaxes(title=ytitle, rangemode='tozero')
+    if what=='risk':fig.update_yaxes(range=[0,max(8.,float(time_frame[[bcol,rcol]].to_numpy().max())*1.19)])
+    return fig
+
+
+def signal_to_injury_section(base:float,rl:float,scenario_label:str)->None:
+    """Show a three-stage trace; user CSV takes precedence over demonstration only."""
+    st.markdown('### 시간별 안전성 분석 · 머리 가속도 → HIC15 → 골절 추정확률')
+    st.markdown('머리에 작용하는 **합성가속도**에서 15ms 이하 구간의 최대 HIC15를 계산한 다음, '
+                'NHTSA의 AIS 2+ 두개골 골절 위험곡선으로 변환합니다.')
+    x1,x2,x3=st.columns(3)
+    for col,name in zip((x1,x2,x3),('① 머리 합성가속도 (g)','② Running HIC15','③ 골절 위험 대응값 (%)')):
+        with col:st.markdown(f'<div class="flow-step">{name}</div>',unsafe_allow_html=True)
+    upload_col,example_col=st.columns([1.28,1],gap='large')
+    with upload_col:
+        incoming=st.file_uploader('머리 가속도 CSV 연결 (선택)',type=['csv'],key='head_acc_signal',
+            help='t_ms, baseline_head_acc_g, rl_head_acc_g 열 필요. 각도/체중/속도 자동검증은 수행하지 않습니다.')
+    with example_col:
+        st.caption('원자료가 없으면 아래 그래프는 평균 HIC15에 맞춘 **인공 예시 파형**을 사용합니다. '
+                   '관찰된 충돌 가속도를 복원한 결과가 아닙니다.')
+        show_example=st.toggle('원자료 미연결 시 예시 신호로 표시',value=True,key='show_demo_signals')
+    using_uploaded=incoming is not None
+    try:
+        if using_uploaded:
+            result=parse_acceleration_csv(incoming.getvalue())
+            provenance='사용자가 업로드한 머리 가속도 CSV에서 직접 계산한 결과 (사고 조건은 자동 대조되지 않음)'
+        elif show_example:
+            result=parse_acceleration_csv(calibrated_demo_acceleration_csv(base,rl))
+            provenance='가상 예시 가속도 파형 · 선택된 HIC 평균에 맞춰 인공적으로 보정한 신호 (실측 아님)'
+        else:
+            st.info('머리 합성가속도 CSV를 업로드하면 3단계 시간별 그래프를 계산해 표시합니다.')
+            return
+    except (ValueError, OSError) as exc:
+        st.error(f'머리 가속도 자료를 읽을 수 없습니다: {exc}')
+        return
+    if not using_uploaded:
+        st.warning('**시연용 가속도 그래프** — 실제 관측된 머리 가속도 이력이 없어 평균 HIC15 수치에 맞춘 '
+                   '합성 파형을 생성했습니다. 그래프의 시간별 형태와 가속도 정점은 물리해석 결과가 아닙니다.')
+    else:
+        st.success('업로드한 시간–머리 가속도 데이터를 사용해 HIC15와 골절 추정위험을 계산했습니다.')
+    sample=trajectory_frame(result)
+    st.caption('데이터 출처 · '+provenance)
+    # A compact three-metric summary is for THIS signal, not the aggregation shown above.
+    m1,m2,m3=st.columns(3)
+    m1.metric('이 신호의 HIC15 (기존 → RL)', f'{result.baseline_hic15:.1f} → {result.rl_hic15:.1f}')
+    r0=float(sample.baseline_skull_fracture_risk_pct.iloc[-1])
+    r1=float(sample.rl_skull_fracture_risk_pct.iloc[-1])
+    m2.metric('이 신호의 골절 추정위험',f'{r0:.2f}% → {r1:.2f}%')
+    m3.metric('골절 위험 대응값 차이',f'{r0-r1:+.2f}%p')
+    st.caption('이 값은 바로 위 **시간 이력 신호에 대한 계산 결과**입니다. 업로드 CSV의 HIC15는 위쪽 실험 집계 평균과 다를 수 있습니다.')
+    for label in ['acc','hic','risk']:
+        st.plotly_chart(_signal_plot(sample,label),use_container_width=True,
+                        config={'displayModeBar':False},key=f'trace_{label}')
+    st.info('**해석:** ③의 그래프는 각 시간까지의 **최대 Running HIC15를 위험함수에 대입한 값**입니다. '
+            '충돌 순간별 골절 발생 확률이나 시간별 실제 골절 빈도를 뜻하지 않습니다. '
+            '골절 위험은 HIC15로부터 계산한 파생 지표입니다.')
+    if (sample[['baseline_running_hic15','rl_running_hic15']] < 175).any().any():
+        st.caption('참고: NHTSA 원곡선의 기초 HIC 자료는 약 175부터 시작합니다. '
+                   '그 미만에서 표시되는 초기 시간대의 위험값은 외삽 결과입니다.')
+    dc1,dc2=st.columns(2)
+    with dc1:
+        st.download_button('3단계 시간별 계산 CSV 다운로드',sample.to_csv(index=False).encode('utf-8-sig'),
+                           file_name='airbag_acceleration_hic15_skull_risk.csv',mime='text/csv',
+                           key='download_signal_result')
+    with dc2:
+        st.download_button('가속도 입력 형식 · 예시 CSV',calibrated_demo_acceleration_csv(base,rl),
+                           file_name='SYNTHETIC_head_acc_example.csv',mime='text/csv',key='example_acc_download')
 
 
 def policy_timeline(direction,mass):
@@ -322,7 +422,7 @@ def sensitivity_panel(base,rl,n=50):
 def scenario_page(real_data):
     st.markdown('<div class="small-kicker">01 / SCENARIO EXPLORER</div>',unsafe_allow_html=True)
     st.title('사고 환경 입력 · 에어백 제어 비교')
-    st.markdown('<div class="lead">차량 접근 방향을 360°로 선택하고, 사고 조건에 대응하는 영상과 HIC15·골절 위험·통계 분석을 한 화면에서 확인합니다.</div>',unsafe_allow_html=True)
+    st.markdown('<div class="lead">차량 접근 방향을 360°로 선택하고, 머리 가속도 → HIC15 → 두개골 골절 추정확률까지 연결해 비교합니다.</div>',unsafe_allow_html=True)
     if 'impact_angle' not in st.session_state:st.session_state.impact_angle=45
     l,r=st.columns([1.18,1],gap='large')
     with l:
@@ -380,6 +480,8 @@ def scenario_page(real_data):
                 f'NHTSA 위험곡선 대응값 **{cmp["baseline_risk_pct"]:.2f}% → {cmp["rl_risk_pct"]:.2f}%** '
                 f'({-cmp["risk_delta_pp"]:.2f}%p 감소).')
     st.caption('위 위험 대응값은 평균 HIC15에 NHTSA AIS 2+ 위험곡선을 적용한 값이며, 골절 발생건수나 실측 발생확률이 아닙니다.')
+
+    signal_to_injury_section(base,rl,f'{speed}km/h / {mass}kg / {direction}')
 
     st.markdown('### 에어백 동작 Factor · 정책 차이')
     pcol,descr=st.columns([1.25,.75],gap='large')
