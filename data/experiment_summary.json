@@ -1,0 +1,43 @@
+{
+  "source": "C011023 김동규 프로젝트결과보고서",
+  "protocol": {
+    "baseline": "2025 Hyundai Tucson 방향 기반 규칙 제어",
+    "unseen_test_cases": 5000,
+    "checkpoint_episodes": 10000,
+    "checkpoint_test_cases": 500
+  },
+  "algorithms": [
+    {
+      "name": "Curriculum PPO",
+      "policy_type": "PPO + curriculum learning",
+      "reduction_pct": 50.8,
+      "first_deployment_ms": 6.0,
+      "deployment_note": "평균 6.0 ms",
+      "reading": "가장 높은 감소율과 안정적 HIC 하락 경향"
+    },
+    {
+      "name": "Curriculum Beta-PPO",
+      "policy_type": "Beta 분포 기반 연속 정책",
+      "reduction_pct": 48.9,
+      "first_deployment_ms": null,
+      "deployment_note": "보고서에 별도 수치 없음",
+      "reading": "PPO에 근접했으나 최종 감소율은 낮음"
+    },
+    {
+      "name": "Curriculum TQC",
+      "policy_type": "TQC 연속 제어",
+      "reduction_pct": 45.6,
+      "first_deployment_ms": null,
+      "deployment_note": "거의 0 ms의 조기 전개 경향",
+      "reading": "공격적 조기 전개에도 PPO보다 낮은 감소율"
+    },
+    {
+      "name": "Curriculum SAC",
+      "policy_type": "SAC 연속 제어",
+      "reduction_pct": 45.4,
+      "first_deployment_ms": null,
+      "deployment_note": "거의 0 ms의 조기 전개 경향",
+      "reading": "공격적 조기 전개에도 PPO보다 낮은 감소율"
+    }
+  ]
+}

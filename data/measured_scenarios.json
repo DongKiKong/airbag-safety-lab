@@ -1,0 +1,64 @@
+{
+  "provenance": "사용자가 제공한 2026-10-19 발표자료 스크린샷의 표 수치 (실제 시뮬레이션 집계 결과); 실제 차량 충돌시험 데이터 아님",
+  "scenario_1": {
+    "title": "시나리오 1 · 사선충돌(45° 부근)",
+    "comparison": "기존 규칙 기반 제어 vs Curriculum PPO",
+    "sample_size": 50,
+    "sample_size_label": "발표자료 표기: HIC15 · 50쌍",
+    "speed_note": "슬라이드 발췌에서 속도·각도가 케이스별로 달라짐",
+    "baseline": {
+      "mean": 245.6,
+      "median": 245.0,
+      "min": 222.0,
+      "max": 273.0
+    },
+    "rl": {
+      "mean": 224.7,
+      "median": 223.0,
+      "min": 200.0,
+      "max": 278.0
+    },
+    "source_image": "scenario1_oblique_report.png",
+    "rows_preview_note": "그림에 있는 6행은 원자료의 발췌이며 통계 표는 50쌍 결과입니다."
+  },
+  "scenario_2": {
+    "title": "시나리오 2 · 체중에 따른 전개 타이밍·압력",
+    "speed_kmh": 80,
+    "angle_deg": 0,
+    "sample_size_label": "각 체중 그룹 50회 시뮬레이션 (프로젝트 실험 설계 기준; 스크린샷 자체에는 표본 수 별도 표기 없음)",
+    "groups": {
+      "60kg": {
+        "label": "약 60kg 그룹",
+        "baseline": {
+          "mean": 232.9,
+          "median": 234.0
+        },
+        "rl": {
+          "mean": 218.5,
+          "median": 217.5
+        },
+        "deployment_timing_mean_ms": 9.8,
+        "deployment_timing_median_ms": 10.0,
+        "deployment_pressure_mean_kpa": 115.8,
+        "deployment_pressure_median_kpa": 116.0
+      },
+      "90kg": {
+        "label": "약 90kg 그룹",
+        "baseline": {
+          "mean": 269.7,
+          "median": 271.0
+        },
+        "rl": {
+          "mean": 243.0,
+          "median": 241.5
+        },
+        "deployment_timing_mean_ms": 20.3,
+        "deployment_timing_median_ms": 20.0,
+        "deployment_pressure_mean_kpa": 184.5,
+        "deployment_pressure_median_kpa": 186.5
+      }
+    },
+    "source_image": "scenario2_weight_report.png",
+    "video_note": "전방충돌.mp4를 60kg, 전방충돌2.mp4를 90kg 비교 영상으로 배치. 체중 메타데이터가 영상에 포함되지 않아 사용자 발표자료의 영상 순서를 기준으로 매핑함."
+  }
+}

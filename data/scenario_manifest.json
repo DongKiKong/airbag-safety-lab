@@ -1,0 +1,42 @@
+{
+  "front": {
+    "title": "전방 충돌",
+    "subtitle": "정면 충돌 상황에서 전방 에어백과 탑승자 거동 비교",
+    "tag": "FRONTAL IMPACT",
+    "default_video_mapping": "발표자료 체중 비교: front_A → 약 60kg, front_B → 약 90kg (영상 메타데이터 없음)",
+    "rl_video": "original/front_B.mp4",
+    "baseline_video": "original/front_A.mp4",
+    "comparison_video": "compare_front.mp4",
+    "swapped_comparison_video": "compare_front_swapped.mp4",
+    "notes": [
+      "제공 자료는 60kg/90kg 체중 비교로, 기존 방식 vs RL 영상 비교로 해석하지 않습니다.",
+      "원본 가로세로 비율을 유지한 합성본입니다."
+    ],
+    "baseline_bags": [
+      "전면 에어백 (영상에서 확인)"
+    ],
+    "rl_bags": [
+      "전면 에어백 (영상에서 확인)"
+    ]
+  },
+  "oblique": {
+    "title": "사선 충돌",
+    "subtitle": "전방 단일 전개와 전방·측면 복합 전개의 시각적 비교",
+    "tag": "OBLIQUE IMPACT",
+    "default_video_mapping": "파일명 기준으로 RL / 기존 방식 구분",
+    "rl_video": "original/oblique_rl.mp4",
+    "baseline_video": "original/oblique_baseline.mp4",
+    "comparison_video": "compare_oblique.mp4",
+    "notes": [
+      "기존 영상 파일명의 '측면충돌' 표기와 사용자 설명의 '사선충돌' 표기가 일치하지 않아 사용자 설명에 따라 사선 비교로 분류했습니다.",
+      "전개 타이밍·강도 수치는 영상으로 판정할 수 없습니다."
+    ],
+    "baseline_bags": [
+      "전면 에어백 (파일명·영상 기준)"
+    ],
+    "rl_bags": [
+      "전면 에어백 (영상 기준)",
+      "측면 보조 에어백 (영상 기준)"
+    ]
+  }
+}
